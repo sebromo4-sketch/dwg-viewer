@@ -1,0 +1,12 @@
+{
+  "name": "dwg-viewer",
+  "owner": { "name": "OWNER" },
+  "plugins": [
+    {
+      "name": "dwg-viewer",
+      "source": "./",
+      "description": "Open and inspect AutoCAD DWG/DXF drawings without AutoCAD (skill + offline 3D viewer).",
+      "version": "1.0.0"
+    }
+  ]
+}

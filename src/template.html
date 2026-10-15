@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>DWG Viewer 3D</title>
+<style>
+:root{
+  --bg:#0e1216; --panel:#141a20; --panel2:#19212a; --line:#252e38; --text:#e1e8ef; --muted:#8b99a9;
+  --accent:#35c3ff; --accent2:#0f7fa8; --warn:#ffb000; --bad:#ff6b5e; --ok:#43d17a;
+  --r:8px; font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);overflow:hidden;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+#app{display:grid;grid-template-columns:1fr 350px;grid-template-rows:auto 1fr auto;height:100dvh;height:100vh}
+@supports (height:100dvh){#app{height:100dvh}}
+#topbar{grid-column:1/3;display:flex;gap:6px;align-items:center;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;white-space:nowrap}
+#topbar::-webkit-scrollbar{display:none}
+.brand{font-weight:700;letter-spacing:.2px;padding:0 8px 0 4px;color:#fff}
+.brand i{font-style:normal;color:var(--accent)}
+.sep{width:1px;align-self:stretch;background:var(--line);margin:2px 4px}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:7px 11px;cursor:pointer;font-size:13px;line-height:1.1;white-space:nowrap}
+.btn:hover{border-color:#3a4857;background:#1e2832}
+.btn:active{transform:translateY(1px)}
+.btn.on{background:var(--accent2);border-color:var(--accent);color:#fff}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#04202c;font-weight:600}
+.btn.primary:hover{background:#5fd0ff}
+.btn.small{padding:5px 8px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:default}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.seg .btn{border:0;border-radius:0;border-right:1px solid var(--line)}
+.seg .btn:last-child{border-right:0}
+#stage{position:relative;min-width:0;min-height:0;background:#101418}
+#view{position:absolute;inset:0}
+#view canvas{display:block;outline:none}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.mlabel{position:absolute;left:0;top:0;background:rgba(10,20,28,.88);border:1px solid #1f6f8f;color:#bfeeff;font-size:12px;padding:2px 6px;border-radius:5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+#snapmark{position:absolute;left:0;top:0;width:16px;height:16px;border:2px solid #ffe14d;pointer-events:none;display:none;box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+#snapmark.free{border-color:#9aa7b4;border-radius:50%;width:10px;height:10px;border-width:1.5px}
+#drop{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;z-index:5}
+#drop .card{max-width:480px;width:100%;text-align:center;border:2px dashed #33414f;border-radius:16px;padding:34px 22px;background:rgba(20,26,32,.88);backdrop-filter:blur(3px)}
+#drop h1{font-size:22px;margin:0 0 8px}
+#drop p{margin:6px 0;color:var(--muted);font-size:14px;line-height:1.45}
+#drop .row{display:flex;gap:8px;justify-content:center;margin-top:18px;flex-wrap:wrap}
+#stage.dragover #drop .card{border-color:var(--accent);background:rgba(15,60,80,.85)}
+#loader{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:9;background:rgba(8,12,16,.72)}
+#loader .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 26px;min-width:260px;text-align:center}
+.spin{width:30px;height:30px;border:3px solid #2a3947;border-top-color:var(--accent);border-radius:50%;margin:0 auto 12px;animation:sp 0.9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);max-width:min(620px,92%);z-index:12;display:none}
+#toast .t{background:#2a1512;border:1px solid #7a2a22;color:#ffd7d2;padding:11px 14px;border-radius:10px;font-size:13px;line-height:1.45;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+#toast .t.info{background:#10222d;border-color:#1f6f8f;color:#cdefff}
+#toast button{float:right;margin-left:10px;background:none;border:0;color:inherit;cursor:pointer;font-size:16px}
+#hint{position:absolute;left:10px;bottom:8px;z-index:3;font-size:12px;color:var(--muted);background:rgba(14,18,22,.7);padding:4px 8px;border-radius:6px;pointer-events:none;max-width:70%}
+#panel{display:flex;flex-direction:column;min-height:0;background:var(--panel);border-left:1px solid var(--line)}
+#tabs{display:flex;border-bottom:1px solid var(--line)}
+#tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:10px 4px;cursor:pointer;color:var(--muted);font-size:13px}
+#tabs button.on{color:#fff;border-bottom-color:var(--accent)}
+.pane{display:none;flex:1;min-height:0;overflow:auto;padding:10px 12px}
+.pane.on{display:block}
+.pane h3{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:14px 0 6px;font-weight:600}
+.pane h3:first-child{margin-top:2px}
+.tools{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+input[type=search],input[type=text]{width:100%;background:#0f151b;border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;margin-bottom:8px}
+#layerlist{margin:0;padding:0;list-style:none}
+#layerlist li{display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:6px;font-size:13px}
+#layerlist li:hover{background:#1b242d}
+#layerlist input{accent-color:var(--accent);width:16px;height:16px;flex:none}
+#layerlist .sw{width:12px;height:12px;border-radius:3px;flex:none;border:1px solid rgba(255,255,255,.25)}
+#layerlist .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+#layerlist .ct{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+#layerlist li.off .nm{color:var(--muted);font-style:italic}
+#layerlist .solo{background:none;border:1px solid var(--line);border-radius:5px;color:var(--muted);font-size:11px;padding:1px 6px;cursor:pointer}
+#layerlist .solo:hover{color:#fff;border-color:var(--accent)}
+table.dt{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+table.dt th{text-align:left;color:var(--muted);font-weight:600;padding:4px 3px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+table.dt td{padding:3px;border-bottom:1px solid #1d2630;white-space:nowrap}
+table.dt tr.go{cursor:pointer}
+table.dt tr.go:hover td{background:#1b2630}
+.scrollbox{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin:6px 0 10px}
+.warnc{border-color:#7a5a1a;background:#241d0d}
+table.kv{width:100%;border-collapse:collapse;font-size:13px}
+table.kv td{padding:4px 2px;border-bottom:1px solid #1d2630;vertical-align:top}
+table.kv td:first-child{color:var(--muted);width:42%;padding-right:8px}
+table.kv td:last-child{word-break:break-word;font-variant-numeric:tabular-nums}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.card.warn{border-color:#6b5320;background:#231d10}
+.card.bad{border-color:#6b2c26;background:#241311}
+.card p{margin:4px 0;font-size:12.5px;line-height:1.45;color:#c4cfda}
+.big{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.opt{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #1d2630;font-size:13px}
+.opt input[type=range]{flex:1;accent-color:var(--accent)}
+.opt select{background:#0f151b;border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+.opt input[type=checkbox]{accent-color:var(--accent);width:17px;height:17px}
+#status{grid-column:1/3;display:flex;gap:16px;align-items:center;padding:5px 12px;background:var(--panel);border-top:1px solid var(--line);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;overflow:hidden;white-space:nowrap}
+#status b{color:var(--text);font-weight:500}
+#status .grow{flex:1;overflow:hidden;text-overflow:ellipsis}
+#panelbtn{display:none}
+@media (max-width:900px){
+  #app{grid-template-columns:1fr}
+  #topbar,#status{grid-column:1}
+  #panel{position:fixed;left:0;right:0;bottom:0;height:52%;z-index:20;border-left:0;border-top:1px solid var(--line);box-shadow:0 -10px 30px rgba(0,0,0,.45);transform:translateY(100%);transition:transform .2s}
+  #panel.open{transform:none}
+  #panelbtn{display:inline-block}
+  #status .hide-m{display:none}
+  #hint{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <span class="brand"><i>DWG</i> Viewer 3D</span>
+    <button class="btn primary" id="btn-open">Open file</button>
+    <input type="file" id="file" accept=".dwg,.dxf,.DWG,.DXF" hidden>
+    <span class="sep"></span>
+    <div class="seg" id="tools">
+      <button class="btn on" data-tool="select" title="Select objects and see properties">Select</button>
+      <button class="btn" data-tool="dist" title="Measure distances (snaps to vertices)">Distance</button>
+      <button class="btn" data-tool="area" title="Measure area and perimeter in plan">Area</button>
+      <button class="btn" data-tool="coord" title="Read real X, Y, Z coordinates">Coordinate</button>
+    </div>
+    <span class="sep"></span>
+    <div class="seg">
+      <button class="btn" id="v-fit" title="Fit to the main area (ignores stray far-away objects)">Fit</button>
+      <button class="btn" id="v-all" title="Full extents, includes everything">All</button>
+      <button class="btn" id="v-top">Plan</button>
+      <button class="btn" id="v-iso">3D</button>
+      <button class="btn" id="v-front">Front</button>
+      <button class="btn" id="v-right">Side</button>
+    </div>
+    <span class="sep"></span>
+    <button class="btn" id="b-proj" title="Toggle perspective / orthographic">Perspective</button>
+    <button class="btn" id="b-pan" title="Left click pans instead of orbiting (useful on laptops or touch screens)">Orbit</button>
+    <button class="btn" id="b-shot">Screenshot</button>
+    <button class="btn" id="panelbtn">Panel</button>
+  </div>
+
+  <div id="stage">
+    <div id="view"></div>
+    <div id="labels"></div>
+    <div id="snapmark"></div>
+    <div id="hint"></div>
+    <div id="toast"></div>
+    <div id="drop">
+      <div class="card">
+        <h1>Open your AutoCAD drawing</h1>
+        <p>Drop a <b>.dwg</b> or <b>.dxf</b> file here, or use the button. Everything is processed on your device: the file is never uploaded and it works offline.</p>
+        <div class="row">
+          <button class="btn primary" id="btn-open2">Choose file</button>
+          <button class="btn" id="btn-demo">View example</button>
+        </div>
+        <p style="margin-top:16px;font-size:12px">Supports DWG R13 to 2018+ (read with LibreDWG) and DXF. Layers, blocks, 3D polylines, 3DFACE meshes, arcs, splines, hatches, text and dimensions.</p>
+      </div>
+    </div>
+    <div id="loader"><div class="box"><div class="spin"></div><div id="loadmsg">Loading…</div><div class="muted" id="loadsub" style="font-size:12px;margin-top:4px"></div></div></div>
+  </div>
+
+  <aside id="panel">
+    <div id="tabs">
+      <button data-pane="p-layers" class="on">Layers</button>
+      <button data-pane="p-info">Info</button>
+      <button data-pane="p-data">Data</button>
+      <button data-pane="p-measure">Measure</button>
+      <button data-pane="p-opts">Options</button>
+    </div>
+    <div class="pane on" id="p-layers">
+      <input type="search" id="layer-q" placeholder="Search layer…">
+      <div class="tools">
+        <button class="btn small" id="l-all">All</button>
+        <button class="btn small" id="l-none">None</button>
+        <button class="btn small" id="l-inv">Invert</button>
+      </div>
+      <ul id="layerlist"></ul>
+      <p class="muted" id="layer-empty" style="font-size:13px">Open a file to see its layers.</p>
+    </div>
+    <div class="pane" id="p-data">
+      <div id="data-card"><p class="muted" style="font-size:13px">Open a file to see its data.</p></div>
+    </div>
+    <div class="pane" id="p-info">
+      <div id="sel-card"></div>
+      <div id="file-card"></div>
+    </div>
+    <div class="pane" id="p-measure">
+      <div id="meas-card"><p class="muted" style="font-size:13px">Pick <b>Distance</b>, <b>Area</b> or <b>Coordinate</b> in the top bar and click on the model. The cursor snaps to vertices, endpoints, centers and insertion points (yellow box). Double click finishes.</p></div>
+    </div>
+    <div class="pane" id="p-opts">
+      <h3>Display</h3>
+      <div class="opt"><span>Background</span><select id="o-bg"><option value="dark">Dark</option><option value="light">Light</option></select></div>
+      <div class="opt"><span>Vertical exaggeration <b id="o-z-val">1×</b></span><input type="range" id="o-z" min="1" max="10" step="0.5" value="1"></div>
+      <div class="opt"><span>Curve quality</span><select id="o-q"><option value="5">Normal (5°)</option><option value="2">High (2°)</option><option value="10">Fast (10°)</option></select></div>
+      <h3>Show</h3>
+      <div class="opt"><span>Lines and curves</span><input type="checkbox" id="s-lines" checked></div>
+      <div class="opt"><span>3DFACE surfaces (shaded)</span><input type="checkbox" id="s-tris" checked></div>
+      <div class="opt"><span>Fills (hatch, solid)</span><input type="checkbox" id="s-fills" checked></div>
+      <div class="opt"><span>Text</span><input type="checkbox" id="s-text" checked></div>
+      <div class="opt"><span>Points</span><input type="checkbox" id="s-pts" checked></div>
+      <div class="opt"><span>Axes at origin</span><input type="checkbox" id="s-axes"></div>
+      <h3>Controls</h3>
+      <div class="card"><p><b>Mouse:</b> left button orbits, right button pans, wheel zooms toward the cursor.</p><p><b>Touch:</b> one finger orbits (or pans, with the Orbit/Pan button), two fingers zoom and pan.</p><p><b>Keys:</b> F fit · T plan · I 3D · Esc cancels · Del/Backspace undoes a point.</p></div>
+    </div>
+  </aside>
+
+  <div id="status">
+    <span id="st-coord" class="grow">No file</span>
+    <span id="st-file" class="hide-m"></span>
+    <span id="st-count" class="hide-m"></span>
+  </div>
+</div>
+<script id="wasm-b64" type="application/octet-stream">__WASM_B64__</script>
+<script id="demo-b64" type="application/octet-stream">__DEMO_B64__</script>
+<script id="embed-b64" type="application/octet-stream" data-name="">__EMBED_B64__</script>
+<script>__BUNDLE__</script>
+</body>
+</html>

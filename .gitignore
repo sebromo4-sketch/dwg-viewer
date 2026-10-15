@@ -1,0 +1,13 @@
+node_modules/
+dist/
+test/out/
+*.log
+.DS_Store
+
+# Never commit real project drawings by accident: only the synthetic samples are allowed.
+*.dwg
+*.dxf
+*.dwf
+*.dwt
+!samples/*.dwg
+!samples/*.dxf

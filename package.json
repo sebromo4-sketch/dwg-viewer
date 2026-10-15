@@ -1,0 +1,47 @@
+{
+  "name": "dwg-viewer",
+  "version": "1.0.0",
+  "description": "Offline DWG/DXF 3D viewer and Claude skill: open AutoCAD drawings without AutoCAD, inspect layers, elevations and points.",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "keywords": [
+    "dwg",
+    "dxf",
+    "autocad",
+    "cad",
+    "viewer",
+    "three.js",
+    "libredwg",
+    "claude-skill"
+  ],
+  "bin": {
+    "dwg-tool": "cli/dwg-tool.mjs"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "build:es": "node build.mjs --lang es",
+    "build:skill": "node build.mjs --skill",
+    "build:all": "node build.mjs && node build.mjs --lang es && node build.mjs --skill",
+    "test": "node test/run.mjs",
+    "package:skill": "node scripts/package-skill.mjs",
+    "test:browser": "node test/browser-smoke.mjs"
+  },
+  "dependencies": {
+    "@mlightcad/dxf-json": "^1.2.8",
+    "@mlightcad/libredwg-web": "0.8.0",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "jsdom": "^29.1.1",
+    "playwright-core": "^1.50.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OWNER/dwg-viewer.git"
+  },
+  "homepage": "https://github.com/OWNER/dwg-viewer#readme"
+}
