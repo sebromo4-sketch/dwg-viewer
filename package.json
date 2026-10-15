@@ -41,7 +41,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OWNER/dwg-viewer.git"
+    "url": "git+https://github.com/sebromo4-sketch/dwg-viewer.git"
   },
-  "homepage": "https://github.com/OWNER/dwg-viewer#readme"
+  "homepage": "https://github.com/sebromo4-sketch/dwg-viewer#readme"
 }

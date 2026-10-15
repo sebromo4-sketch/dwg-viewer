@@ -1,6 +1,6 @@
 {
   "name": "dwg-viewer",
-  "owner": { "name": "OWNER" },
+  "owner": { "name": "sebromo4-sketch" },
   "plugins": [
     {
       "name": "dwg-viewer",

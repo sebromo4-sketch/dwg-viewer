@@ -16,7 +16,7 @@
 ## Quick start
 
 ### Just view a drawing
-1. Download `dwg-viewer.html` from the [latest release](https://github.com/OWNER/dwg-viewer/releases/latest) (`dwg-viewer-es.html` for a Spanish UI).
+1. Download `dwg-viewer.html` from the [latest release](https://github.com/sebromo4-sketch/dwg-viewer/releases/latest) (`dwg-viewer-es.html` for a Spanish UI).
 2. Open it in Chrome, Edge, Firefox or Safari (a recent version — it needs `DecompressionStream`).
 3. Drag your `.dwg` / `.dxf` onto the page, or press **Open file**. Works with no internet.
 
@@ -29,13 +29,13 @@ Install the skill (below), then just attach a DWG and say *"open this and tell m
 
 ### Claude Code (plugin marketplace)
 ```text
-/plugin marketplace add OWNER/dwg-viewer
+/plugin marketplace add sebromo4-sketch/dwg-viewer
 /plugin install dwg-viewer@dwg-viewer
 ```
 Restart/reload, then attach any `.dwg` or `.dxf` and ask about it.
 
 ### Claude.ai / Claude desktop (skill upload)
-1. Download `dwg-viewer-skill.zip` from the [latest release](https://github.com/OWNER/dwg-viewer/releases/latest).
+1. Download `dwg-viewer-skill.zip` from the [latest release](https://github.com/sebromo4-sketch/dwg-viewer/releases/latest).
 2. **Settings → Capabilities → Skills → Upload skill** and pick the zip. (Code execution must be enabled.)
 3. Attach a DWG to a chat: *"Open this drawing and summarize it."*
 
@@ -72,7 +72,7 @@ node skills/dwg-viewer/scripts/dwg-tool.mjs viewer drawing.dwg --out drawing-vie
 ## Build from source
 
 ```bash
-git clone https://github.com/OWNER/dwg-viewer && cd dwg-viewer
+git clone https://github.com/sebromo4-sketch/dwg-viewer && cd dwg-viewer
 npm ci
 npm test                 # CLI + jsdom UI smoke tests on synthetic drawings (DWG R2000…2018, DXF)
 npm run build:all        # dist/dwg-viewer.html, dist/dwg-viewer-es.html, refreshes skills/dwg-viewer/

@@ -2,8 +2,8 @@
   "name": "dwg-viewer",
   "version": "1.0.0",
   "description": "Open and inspect AutoCAD DWG/DXF drawings without AutoCAD: layers, coordinates, elevations, points, a plan-view SVG and a standalone offline 3D viewer.",
-  "homepage": "https://github.com/OWNER/dwg-viewer",
-  "repository": "https://github.com/OWNER/dwg-viewer",
+  "homepage": "https://github.com/sebromo4-sketch/dwg-viewer",
+  "repository": "https://github.com/sebromo4-sketch/dwg-viewer",
   "license": "GPL-3.0-or-later",
   "keywords": ["dwg", "dxf", "autocad", "cad", "viewer", "gis", "survey"]
 }
