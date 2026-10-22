@@ -3,7 +3,8 @@ import { DxfParser } from '@mlightcad/dxf-json';
 import { fromDwgDatabase, fromDxfJson } from './model.js';
 import { buildGeometry } from './geom.js';
 import { Viewer, fmtN } from './viewer.js';
-import { buildSvg } from './svg.js';
+import { buildSvg, fullRegion, regionFromRect } from './svg.js';
+import { detectViews, dominantAngle } from './views.js';
 import { buildDatos, pointsCsv } from './datos.js';
 
 const $ = (id) => document.getElementById(id);
@@ -150,6 +151,7 @@ async function buildAndShow() {
   renderLayers();
   renderFileCard();
   renderDatos();
+  computeViews();
   renderSelection(null);
   $('st-file').innerHTML = `<b>${esc(state.file.name)}</b>`;
   $('st-count').textContent = `${g.layers.length} layers · ${g.stats.entities.toLocaleString('en-US')} objects`;
@@ -383,31 +385,198 @@ $('v-right').onclick = () => viewer.fit(false, 'right');
 let ortho = false, panMode = false;
 $('b-proj').onclick = () => { ortho = !ortho; viewer.setProjection(ortho); $('b-proj').textContent = ortho ? 'Orthographic' : 'Perspective'; $('b-proj').classList.toggle('on', ortho); };
 $('b-pan').onclick = () => { panMode = !panMode; viewer.setPanMode(panMode); $('b-pan').textContent = panMode ? 'Pan' : 'Orbit'; $('b-pan').classList.toggle('on', panMode); };
-const expMenu = $('expmenu');
-const saveBlob = (blob, name) => {
+// ------------------------------------------------------------------ views (sheets with several drawings)
+state.views = null; state.viewSel = null;
+function viewAngle(v) { // angle to use for a view/the sheet according to the Orientation option
+  const mode = $('vw-rot').value;
+  return mode === 'auto' ? (v?.angle ?? 0) : 0;
+}
+function focusView(v) {
+  if (!v) { // whole sheet
+    state.viewSel = null;
+    const r = state.views.sheet.rect;
+    viewer.viewRect(r, 0);
+    viewer.setClipRect(null);
+    $('vw-ang').value = 0; $('vw-ang-val').textContent = '0°';
+  } else {
+    state.viewSel = v.id;
+    const ang = viewAngle(v);
+    viewer.viewRect(v.rect, ang);
+    viewer.setClipRect($('vw-iso').checked ? v.rect : null);
+    $('vw-ang').value = ang; $('vw-ang-val').textContent = ang + '°';
+  }
+  document.querySelectorAll('.vrow').forEach((r) => r.classList.toggle('on', state.viewSel != null && +r.dataset.id === state.viewSel));
+}
+function renderViews() {
+  const el = $('vw-list');
+  if (!state.views || !state.views.views.length) { el.innerHTML = '<p class="muted" style="font-size:13px">No separate blocks were detected in this drawing. Use <b>Straighten</b> or the rotation slider, and Export → Current view.</p>'; return; }
+  const u = unitLabel();
+  el.innerHTML = state.views.views.map((v) => `<div class="vrow" data-id="${v.id}"><span class="nm" title="${esc(v.name)}">${esc(v.name)}</span><span class="tag">${fmtN(v.rect[2] - v.rect[0], 0)}×${fmtN(v.rect[3] - v.rect[1], 0)} ${u}${Math.abs(v.angle) > 3 ? ' · tilt ' + v.angle + '°' : ''}</span></div>`).join('');
+  el.querySelectorAll('.vrow').forEach((r) => (r.onclick = () => focusView(state.views.views[+r.dataset.id])));
+}
+function computeViews() {
+  try { state.views = detectViews(state.model, state.g); } catch (e) { console.warn('view detection failed', e); state.views = null; }
+  state.viewSel = null;
+  viewer.setClipRect(null);
+  $('vw-iso').checked = false;
+  renderViews();
+}
+$('vw-sheet').onclick = () => state.views && focusView(null);
+$('vw-reset').onclick = () => { viewer.setClipRect(null); $('vw-iso').checked = false; if (state.g) viewer.fit(false, 'top'); state.viewSel = null; document.querySelectorAll('.vrow').forEach((r) => r.classList.remove('on')); };
+$('vw-iso').onchange = () => { const v = state.views?.views[state.viewSel]; viewer.setClipRect($('vw-iso').checked && v ? v.rect : null); };
+$('vw-rot').onchange = () => { const v = state.views?.views[state.viewSel]; if (v) focusView(v); };
+$('vw-ang').oninput = () => {
+  const a = Number($('vw-ang').value);
+  $('vw-ang-val').textContent = a + '°';
+  const v = state.views?.views[state.viewSel];
+  const rect = v ? v.rect : state.views ? state.views.sheet.rect : null;
+  if (rect) viewer.viewRect(rect, a);
+};
+$('b-straight').onclick = () => {
+  if (!state.g || !state.views) return;
+  const vs = state.views.views;
+  const v = vs[state.viewSel] || vs.find((x) => x.kind === 'plan') || null;
+  if (!v) {
+    const rect = state.views.sheet.rect;
+    const a = dominantAngle(state.g, rect);
+    viewer.viewRect(rect, a); $('vw-ang').value = a; $('vw-ang-val').textContent = a + '°';
+    return;
+  }
+  $('vw-rot').value = 'auto';
+  focusView(v);
+  setHint(`Straightened "${v.name}": rotated ${v.angle}° so its main axes are horizontal/vertical. Use Views → Rotation to fine tune.`);
+  setTimeout(() => setHint(''), 7000);
+};
+
+// ------------------------------------------------------------------ export dialog (with preview)
+const X = { token: 0, timer: 0, url: null, blob: null, name: '', info: '' };
+function saveBlob(blob, name) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
   a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-};
-$('b-shot').onclick = (e) => { e.stopPropagation(); if (state.g) expMenu.hidden = !expMenu.hidden; };
-document.addEventListener('click', () => { expMenu.hidden = true; });
-expMenu.querySelectorAll('button').forEach((btn) => (btn.onclick = async () => {
-  expMenu.hidden = true;
-  if (!state.g) return;
-  const base = (state.file?.name || 'view').replace(/\.[^.]+$/, '');
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function fillAreaOptions() {
+  const sel = $('x-area');
+  const keep = sel.value;
+  const opts = ['<option value="view">Current view (what you see now)</option>'];
+  if (state.views) {
+    opts.push('<option value="sheet">Whole sheet</option>');
+    for (const v of state.views.views) opts.push(`<option value="v${v.id}">${esc(v.name)}</option>`);
+  } else opts.push('<option value="sheet">Whole drawing</option>');
+  sel.innerHTML = opts.join('');
+  sel.value = [...sel.options].some((o) => o.value === keep) ? keep : (state.views ? 'sheet' : 'view');
+}
+function exportRegion() {
+  const g = state.g, area = $('x-area').value, rot = $('x-rot').value;
+  const asis = viewer.planAngle();
+  let rect = null, auto = 0;
+  if (area === 'view') {
+    if (viewer.isTopDown()) return { region: viewer.visibleRegion(), label: 'current view' };
+    // not looking straight down: fall back to the whole sheet
+    rect = state.views ? state.views.sheet.rect : null;
+    if (!rect) return { region: fullRegion(g), label: 'whole drawing' };
+    return { region: regionFromRect(rect, rot === 'asis' ? asis : 0), label: 'whole sheet (the camera is not looking straight down)' };
+  }
+  if (area === 'sheet') { rect = state.views ? state.views.sheet.rect : null; if (!rect) return { region: fullRegion(g), label: 'whole drawing' }; auto = 0; }
+  else { const v = state.views.views[+area.slice(1)]; rect = v.rect; auto = v.angle; }
+  const a = rot === 'auto' ? auto : rot === 'asis' ? asis : 0;
+  return { region: regionFromRect(rect, a), label: area === 'sheet' ? 'whole sheet' : state.views.views[+area.slice(1)].name };
+}
+function planSvg(preview, width) {
+  const { region } = exportRegion();
+  return buildSvg(state.g, {
+    style: $('x-style').value, region, width, preview,
+    lineScale: Number($('x-weight').value), texts: $('x-texts').checked, visible: viewer.layerVis,
+    transparent: $('x-transp').checked && $('x-fmt').value === 'png', unit: unitLabel(),
+  });
+}
+function syncExportUi() {
+  const is3d = $('x-src').value === '3d';
+  $('x-plan-opts').style.display = is3d ? 'none' : '';
+  $('x-fmt-box').style.display = is3d ? 'none' : '';
+  $('x-px-box').style.display = is3d || $('x-fmt').value === 'png' ? '' : 'none';
+}
+function schedulePreview() { clearTimeout(X.timer); X.timer = setTimeout(refreshPreview, 180); }
+async function refreshPreview() {
+  const my = ++X.token;
+  const box = $('x-prevbox');
+  box.classList.add('loading');
+  await new Promise((r) => setTimeout(r, 30));
   try {
-    const k = btn.dataset.exp;
-    if (k === 'svg') {
-      const svg = buildSvg(state.g, { light: $('o-bg').value === 'light', width: 2400, visible: viewer.layerVis });
-      saveBlob(new Blob([svg], { type: 'image/svg+xml' }), base + '-plan.svg');
+    const base = (state.file?.name || 'drawing').replace(/\.[^.]+$/, '');
+    let blob, info;
+    if ($('x-src').value === '3d') {
+      const w = Number($('x-px').value);
+      blob = await viewer.exportImage({ scale: 1, labels: $('x-texts').checked, transparent: $('x-transp').checked });
+      info = `3D view · PNG ${Math.round(Math.min(w, viewer.size.w * 8))} px wide`;
+      X.name = base + '-3d.png';
     } else {
-      const blob = await viewer.exportImage({ scale: k === 'png6' ? 6 : 3, transparent: k === 'pngt' });
-      saveBlob(blob, base + '-view.png');
+      const svg = planSvg(true, 1100);
+      blob = new Blob([svg], { type: 'image/svg+xml' });
+      const { region, label } = exportRegion();
+      const u = unitLabel();
+      info = `${label} · ${fmtN(region.w, 1)} × ${fmtN(region.h, 1)} ${u}${Math.abs(region.a) > 0.05 ? ' · rotated ' + fmtN(region.a, 1) + '°' : ''}`;
+      X.name = base + '-' + (label.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 30) || 'plan') + ($('x-fmt').value === 'png' ? '.png' : '.svg');
     }
-  } catch (err) { console.error(err); alert('Could not export: ' + err.message); }
-}));
+    if (my !== X.token) return;
+    if (X.url) URL.revokeObjectURL(X.url);
+    X.url = URL.createObjectURL(blob);
+    $('x-prev').src = X.url;
+    $('x-info').textContent = info + ' · the preview is simplified; the download has full detail.';
+  } catch (err) {
+    console.error(err);
+    $('x-info').textContent = 'Preview failed: ' + (err?.message || err);
+  } finally {
+    if (my === X.token) box.classList.remove('loading');
+  }
+}
+async function doDownload() {
+  const btn = $('x-dl');
+  btn.disabled = true; btn.textContent = 'Preparing…';
+  await new Promise((r) => setTimeout(r, 30));
+  try {
+    if ($('x-src').value === '3d') {
+      const w = Number($('x-px').value);
+      const blob = await viewer.exportImage({ scale: Math.max(1, w / viewer.size.w), labels: $('x-texts').checked, transparent: $('x-transp').checked });
+      saveBlob(blob, X.name || 'view-3d.png');
+    } else if ($('x-fmt').value === 'svg') {
+      saveBlob(new Blob([planSvg(false, 2400)], { type: 'image/svg+xml' }), X.name);
+    } else {
+      const W = Number($('x-px').value);
+      const { region } = exportRegion();
+      const H = Math.round((W * region.h) / region.w);
+      if (H > 16000) throw new Error('The area is too tall for a PNG at this width; choose a smaller width or use SVG.');
+      const svg = planSvg(false, W);
+      const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+      const img = new Image();
+      await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('The browser could not rasterize the drawing. Try SVG or a smaller width.')); img.src = url; });
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+      const c = cv.getContext('2d');
+      c.drawImage(img, 0, 0, W, H);
+      URL.revokeObjectURL(url);
+      const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
+      if (!blob) throw new Error('Could not create the PNG (the image is too large for this device).');
+      saveBlob(blob, X.name);
+    }
+  } catch (err) { console.error(err); alert('Could not export: ' + (err?.message || err)); }
+  btn.disabled = false; btn.textContent = 'Download';
+}
+function openExport() {
+  if (!state.g) return;
+  fillAreaOptions();
+  syncExportUi();
+  $('expdlg').hidden = false;
+  schedulePreview();
+}
+function closeExport() { $('expdlg').hidden = true; if (X.url) { URL.revokeObjectURL(X.url); X.url = null; $('x-prev').removeAttribute('src'); } }
+$('b-shot').onclick = openExport;
+$('x-close').onclick = $('x-cancel').onclick = closeExport;
+$('expdlg').addEventListener('mousedown', (e) => { if (e.target === $('expdlg')) closeExport(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('expdlg').hidden) closeExport(); });
+for (const id of ['x-src', 'x-area', 'x-rot', 'x-style', 'x-weight', 'x-texts', 'x-transp', 'x-fmt', 'x-px']) $(id).onchange = () => { syncExportUi(); schedulePreview(); };
+$('x-dl').onclick = doDownload;
 $('panelbtn').onclick = () => $('panel').classList.toggle('open');
 document.querySelectorAll('#tabs button').forEach((b) => (b.onclick = () => {
   document.querySelectorAll('#tabs button').forEach((x) => x.classList.toggle('on', x === b));

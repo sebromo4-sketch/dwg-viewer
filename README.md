@@ -52,7 +52,8 @@ The skill needs **Node.js ≥ 20** in Claude's sandbox and nothing else: the CLI
 | **Appearance** | Layer colors, ByLayer/ByBlock, ACI + true color, linetypes (dashes), layer on/off/frozen, hatch fills |
 | **3D** | Real X/Y/Z, perspective/orthographic, plan/front/side/3D views, vertical exaggeration |
 | **Data tab** | Elevation range per layer, objects with Z ≠ 0, table of all points (E, N, Z) with click-to-zoom and **CSV download**, block attributes (e.g. names from KML imports) |
-| **Tools** | Pick objects (properties), distance (3D, horizontal, slope, azimuth), plan area/perimeter, real coordinates, snapping to vertices/endpoints/centers, export as high-res PNG (3×–6×, optional transparent background) or vector SVG plan view |
+| **Views** | Sheets that hold several drawings (plan, tables, details, title block) are split into blocks you can jump to; **Straighten** rotates a tilted site so its main axes are horizontal/vertical |
+| **Tools** | Pick objects (properties), distance (3D, horizontal, slope, azimuth), plan area/perimeter, real coordinates, snapping to vertices/endpoints/centers, **Export** dialog with live preview: plan as SVG/PNG in three styles (white-sheet B/W, white-sheet color, dark AutoCAD), any detected block or the current view, straightened or north-up; or the current 3D view as high-res PNG |
 | **Numeric safety** | Recenters huge coordinates (UTM, state plane) internally so nothing jitters; real coordinates are shown everywhere |
 
 **Elevations, honestly.** Many DWGs are flat (all Z = 0 — KML/GIS exports, survey sheets). The viewer never invents altitudes: the Data tab and `dwg-tool info` say when a drawing is flat and list exactly which objects carry a Z. Points with Z = -999999 (a common "no elevation" marker) are treated as 0. Spot heights written only as text are exported by `dwg-tool texts`.

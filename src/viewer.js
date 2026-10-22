@@ -254,11 +254,12 @@ export class Viewer {
     const R = Math.max(0.5 * Math.hypot(mx[0] - mn[0], mx[1] - mn[1], (mx[2] - mn[2]) * this.zEx), 0.01);
     this.view(dirName, c, R);
   }
-  view(name, center, R) {
+  view(name, center, R, angle = 0) {
     const c = center || this.fitCenter || new V3();
     R = R || this.radius();
     const dirs = { iso: [1, -1.1, 0.85], top: [0, -1e-4, 1], front: [0, -1, 0.0001], right: [1, 0, 0.0001], back: [0, 1, 0.0001], left: [-1, 0, 0.0001] };
     const dv = new V3(...(dirs[name] || dirs.iso)).normalize();
+    if (name === 'top' && angle) { const t = rad(angle); dv.set(Math.sin(t) * 1e-4, -Math.cos(t) * 1e-4, 1).normalize(); }
     const cam = this.cam;
     let dist;
     if (cam.isPerspectiveCamera) dist = (R * 1.1) / Math.sin(rad(Math.min(cam.fov, cam.fov * cam.aspect) / 2));
@@ -273,6 +274,57 @@ export class Viewer {
     cam.lookAt(c);
     this.controls.update();
     this.updateClip();
+    this.requestRender();
+  }
+  // Plan angle: CCW angle (deg) of the screen-up direction from north, read from the camera. 0 = north up.
+  planAngle() {
+    const d = this.cam.position.clone().sub(this.controls.target);
+    if (Math.hypot(d.x, d.y) < 1e-9 * d.length()) return 0;
+    return (Math.atan2(d.x, -d.y) * 180) / Math.PI;
+  }
+  isTopDown() {
+    const d = this.cam.position.clone().sub(this.controls.target).normalize();
+    return d.z > 0.9995;
+  }
+  // The plan rectangle currently on screen as {cx, cy, w, h, a} (only meaningful in plan view).
+  visibleRegion() {
+    const { w, h } = this.size;
+    const t = this.controls.target;
+    const worldH = this.pixelWorld() * h, worldW = this.pixelWorld() * w;
+    return { cx: t.x, cy: t.y, w: worldW, h: worldH, a: this.planAngle() };
+  }
+  // Frame a plan rectangle [x0,y0,x1,y1] straight from above, rotated by `angle`.
+  viewRect(rect, angle = 0) {
+    const cx = (rect[0] + rect[2]) / 2, cy = (rect[1] + rect[3]) / 2;
+    const t = rad(angle), c = Math.cos(t), s = Math.sin(t);
+    let hw = 0, hh = 0;
+    for (const [x, y] of [[rect[0], rect[1]], [rect[2], rect[1]], [rect[2], rect[3]], [rect[0], rect[3]]]) {
+      hw = Math.max(hw, Math.abs((x - cx) * c + (y - cy) * s));
+      hh = Math.max(hh, Math.abs(-(x - cx) * s + (y - cy) * c));
+    }
+    const aspect = this.size.w / this.size.h;
+    const halfH = Math.max(hh, hw / aspect) * 1.06;
+    const z = this.controls.target.z;
+    const cen = new V3(cx, cy, z);
+    const cam = this.cam;
+    const dv = new V3(Math.sin(t) * 1e-4, -Math.cos(t) * 1e-4, 1).normalize();
+    let dist;
+    if (cam.isPerspectiveCamera) dist = halfH / Math.tan(rad(cam.fov / 2));
+    else { dist = Math.max(this.radius() * 6, halfH * 6); this.orthoH = 2 * halfH; cam.zoom = 1; this.applyOrtho(); }
+    cam.position.copy(cen).addScaledVector(dv, dist);
+    this.controls.target.copy(cen);
+    cam.lookAt(cen);
+    this.controls.update();
+    this.updateClip();
+    this.requestRender();
+  }
+  // Show only what is inside rect (or everything when rect is null).
+  setClipRect(rect) {
+    this.clipRect = rect;
+    this.renderer.clippingPlanes = rect ? [
+      new THREE.Plane(new V3(1, 0, 0), -rect[0]), new THREE.Plane(new V3(-1, 0, 0), rect[2]),
+      new THREE.Plane(new V3(0, 1, 0), -rect[1]), new THREE.Plane(new V3(0, -1, 0), rect[3]),
+    ] : [];
     this.requestRender();
   }
   setProjection(ortho) {
@@ -630,6 +682,7 @@ export class Viewer {
     for (const l of this.labels) {
       const s = this._project(...l.p);
       if (!s || s[0] < -50 || s[0] > this.size.w + 50 || s[1] < -50 || s[1] > this.size.h + 50) { l.el.style.display = 'none'; continue; }
+      if (this.clipRect && (l.p[0] < this.clipRect[0] || l.p[0] > this.clipRect[2] || l.p[1] < this.clipRect[1] || l.p[1] > this.clipRect[3])) { l.el.style.display = 'none'; continue; }
       l.el.style.display = 'block';
       l.el.style.transform = `translate(${s[0]}px, ${s[1]}px) translate(-50%, -140%)`;
     }

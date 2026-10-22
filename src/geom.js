@@ -177,6 +177,7 @@ function catmull(pts, per) { // pts: array [x,y,z]; centripetal
 export function cleanText(s, multiline) {
   if (s == null) return '';
   let t = String(s);
+  t = t.replace(/\\[pP][^;]*;/g, ''); // paragraph codes (\pxql; \pi14.5;) also show up in plain TEXT
   t = t.replace(/%%[cC]/g, 'Ø').replace(/%%[dD]/g, '°').replace(/%%[pP]/g, '±').replace(/%%%/g, '%').replace(/%%[uUoO]/g, '');
   if (multiline) {
     t = t.replace(/\\U\+([0-9A-Fa-f]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));

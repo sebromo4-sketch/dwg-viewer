@@ -10,7 +10,8 @@ import { DxfParser } from '@mlightcad/dxf-json';
 import { fromDwgDatabase, fromDxfJson } from '../src/model.js';
 import { buildGeometry } from '../src/geom.js';
 import { buildDatos, pointsCsv } from '../src/datos.js';
-import { buildSvg } from '../src/svg.js';
+import { buildSvg, regionFromRect } from '../src/svg.js';
+import { detectViews } from '../src/views.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const VERSIONS = {
@@ -132,7 +133,8 @@ const HELP = `dwg-tool — read DWG/DXF offline
   node dwg-tool.mjs info    <file> [--json]                 summary: layers, extents, elevations, objects not drawn
   node dwg-tool.mjs points  <file> [--layer NAME] [--out points.csv]
   node dwg-tool.mjs texts   <file> [--layer NAME] [--out texts.csv]
-  node dwg-tool.mjs plan    <file> --out plan.svg [--light] [--width 1600]
+  node dwg-tool.mjs plan    <file> --out plan.svg [--style bw|color|cad] [--view N|sheet] [--no-straighten] [--width 2400]
+  node dwg-tool.mjs views   <file>                          list the blocks of a sheet (plan, tables, details) with their tilt
   node dwg-tool.mjs viewer  <file> --out viewer.html [--lang en|es]   standalone 3D viewer with the file embedded
   node dwg-tool.mjs viewer  --out viewer.html                          empty viewer (drag & drop a file)
 `;
@@ -167,9 +169,22 @@ async function main() {
     const rows = [];
     for (const L of g.layers) if (!a.layer || L.name === a.layer) for (const t of L.texts) rows.push([csvq(L.name), csvq(String(t.str).replace(/\s+/g, ' ')), (t.T[12]).toFixed(4), (t.T[13]).toFixed(4), (t.T[14]).toFixed(4)].join(','));
     write(a.out, ['layer,text,east,north,elevation', ...rows].join('\r\n'));
+  } else if (cmd === 'views') {
+    const dv = detectViews(r.model, g);
+    const f = (v) => Math.round((v + 0) * 10) / 10;
+    const lines = [`# ${path.basename(file)}: ${dv.views.length} views detected`, `Sheet: ${dv.sheet.found ? 'border found' : 'no border; using extents'} E ${f(dv.sheet.rect[0] + g.origin[0])}…${f(dv.sheet.rect[2] + g.origin[0])} N ${f(dv.sheet.rect[1] + g.origin[1])}…${f(dv.sheet.rect[3] + g.origin[1])}`, ''];
+    for (const v of dv.views) lines.push(`${v.id}. [${v.kind}] ${v.name} — ${f(v.rect[2] - v.rect[0])} × ${f(v.rect[3] - v.rect[1])} m, tilt ${v.angle}°`);
+    write(a.out, lines.join('\n'));
   } else if (cmd === 'plan') {
     if (!a.out) throw new Error('plan needs --out plan.svg');
-    write(a.out, buildSvg(g, { light: !!a.light, width: Number(a.width) || 1600 }));
+    let region;
+    if (a.view !== undefined) {
+      const dv = detectViews(r.model, g);
+      const v = a.view === 'sheet' ? { rect: dv.sheet.rect, angle: 0 } : dv.views[Number(a.view)];
+      if (!v) throw new Error(`No view "${a.view}". Run the views command to list them.`);
+      region = regionFromRect(v.rect, a.straighten === false || a['no-straighten'] ? 0 : v.angle);
+    }
+    write(a.out, buildSvg(g, { style: a.style || (a.light ? 'color' : 'bw'), region, width: Number(a.width) || 2400, unit: unitsOf(r.model, g).effective }));
   } else throw new Error('Unknown command: ' + cmd + '\n' + HELP);
 }
 

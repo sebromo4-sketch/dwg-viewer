@@ -29,7 +29,8 @@ Everything runs locally with Node.js ≥ 20. No `npm install`, no network, nothi
    ```bash
    node SKILL_DIR/scripts/dwg-tool.mjs points "<file>" [--layer "NAME"] --out points.csv   # layer,name,east,north,elevation
    node SKILL_DIR/scripts/dwg-tool.mjs texts  "<file>" [--layer "NAME"] --out texts.csv    # layer,text,east,north,elevation
-   node SKILL_DIR/scripts/dwg-tool.mjs plan   "<file>" --out plan.svg [--light]            # flat top view
+   node SKILL_DIR/scripts/dwg-tool.mjs plan   "<file>" --out plan.svg [--style bw|color|cad] [--view N|sheet] [--no-straighten]   # flat top view
+   node SKILL_DIR/scripts/dwg-tool.mjs views  "<file>"                                       # blocks of a multi-drawing sheet
    ```
 4. **Deliver the viewer** when the user wants to *see* the drawing (this is the default deliverable for "open this DWG"):
    ```bash
@@ -39,6 +40,9 @@ Everything runs locally with Node.js ≥ 20. No `npm install`, no network, nothi
    Send the `.html` to the user (file delivery) or publish it as an artifact. It opens the drawing automatically and also lets the user drag in other DWG/DXF files. The page contains the drawing's data, so mention that if the user plans to share the link.
 5. **Show a quick picture** in the chat when useful: the plan SVG can be sent as a file; if a rasterizer is available (e.g. `rsvg-convert`, `inkscape`, or a headless browser) convert it to PNG to preview.
 6. A viewer with no file (`viewer --out empty.html`, no input path) is a drag-and-drop viewer and can be handed out as a reusable tool.
+
+## Sheets with several drawings
+Many DWGs are a whole sheet: site plan (often rotated against north), coordinate tables, details, location sketches and the title block in one model space. Run `views` to list the detected blocks with their tilt, then `plan --view N` exports one block straightened (`--no-straighten` keeps north up). `--style bw` gives a white sheet with black lines (architectural look), `color` keeps the original colors darkened for print, `cad` keeps the dark AutoCAD look. In the HTML viewer the same things live in the **Views** tab, the **Straighten** button and **Export** (live preview, SVG or PNG). Detection is heuristic (framed boxes + clustering); if a block is missed, export the current view instead.
 
 ## Be honest about elevations
 
