@@ -3,6 +3,7 @@ import { DxfParser } from '@mlightcad/dxf-json';
 import { fromDwgDatabase, fromDxfJson } from './model.js';
 import { buildGeometry } from './geom.js';
 import { Viewer, fmtN } from './viewer.js';
+import { buildSvg } from './svg.js';
 import { buildDatos, pointsCsv } from './datos.js';
 
 const $ = (id) => document.getElementById(id);
@@ -382,15 +383,31 @@ $('v-right').onclick = () => viewer.fit(false, 'right');
 let ortho = false, panMode = false;
 $('b-proj').onclick = () => { ortho = !ortho; viewer.setProjection(ortho); $('b-proj').textContent = ortho ? 'Orthographic' : 'Perspective'; $('b-proj').classList.toggle('on', ortho); };
 $('b-pan').onclick = () => { panMode = !panMode; viewer.setPanMode(panMode); $('b-pan').textContent = panMode ? 'Pan' : 'Orbit'; $('b-pan').classList.toggle('on', panMode); };
-$('b-shot').onclick = async () => {
-  if (!state.g) return;
-  const blob = await viewer.screenshot();
+const expMenu = $('expmenu');
+const saveBlob = (blob, name) => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = (state.file?.name || 'view').replace(/\.[^.]+$/, '') + '-view.png';
+  a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 };
+$('b-shot').onclick = (e) => { e.stopPropagation(); if (state.g) expMenu.hidden = !expMenu.hidden; };
+document.addEventListener('click', () => { expMenu.hidden = true; });
+expMenu.querySelectorAll('button').forEach((btn) => (btn.onclick = async () => {
+  expMenu.hidden = true;
+  if (!state.g) return;
+  const base = (state.file?.name || 'view').replace(/\.[^.]+$/, '');
+  try {
+    const k = btn.dataset.exp;
+    if (k === 'svg') {
+      const svg = buildSvg(state.g, { light: $('o-bg').value === 'light', width: 2400, visible: viewer.layerVis });
+      saveBlob(new Blob([svg], { type: 'image/svg+xml' }), base + '-plan.svg');
+    } else {
+      const blob = await viewer.exportImage({ scale: k === 'png6' ? 6 : 3, transparent: k === 'pngt' });
+      saveBlob(blob, base + '-view.png');
+    }
+  } catch (err) { console.error(err); alert('Could not export: ' + err.message); }
+}));
 $('panelbtn').onclick = () => $('panel').classList.toggle('open');
 document.querySelectorAll('#tabs button').forEach((b) => (b.onclick = () => {
   document.querySelectorAll('#tabs button').forEach((x) => x.classList.toggle('on', x === b));

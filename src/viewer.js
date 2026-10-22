@@ -320,6 +320,53 @@ export class Viewer {
     this.render();
     return new Promise((res) => this.renderer.domElement.toBlob(res, 'image/png'));
   }
+  // High-resolution export of the current view (no screen capture: it is re-rendered at `scale`x).
+  // opts: { scale = 3, labels = true, transparent = false }
+  async exportImage(opts = {}) {
+    const { w, h } = this.size;
+    const r = this.renderer, gl = r.getContext();
+    const maxDim = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 4096, gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096, 8192);
+    const scale = Math.max(1, Math.min(opts.scale || 3, maxDim / Math.max(w, h)));
+    const prevPR = r.getPixelRatio(), prevBg = this.scene.background;
+    try {
+      r.setPixelRatio(scale);
+      r.setSize(w, h, false);
+      if (opts.transparent) { this.scene.background = null; r.setClearColor(0x000000, 0); }
+      this.cam.updateMatrixWorld();
+      r.render(this.scene, this.cam);
+      const W = Math.round(w * scale), H = Math.round(h * scale);
+      const cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      const c = cv.getContext('2d');
+      c.drawImage(r.domElement, 0, 0, W, H);
+      if (opts.labels !== false && this.labels.length) {
+        this._prepProj();
+        const light = prevBg && prevBg.r > 0.5;
+        c.font = `${Math.round(11 * scale)}px system-ui, Arial, sans-serif`;
+        c.textAlign = 'center'; c.textBaseline = 'bottom';
+        c.lineJoin = 'round'; c.lineWidth = 3 * scale;
+        for (const l of this.labels) {
+          if (l.el.style.display === 'none') continue;
+          const s = this._project(...l.p);
+          if (!s || s[0] < 0 || s[0] > w || s[1] < 0 || s[1] > h) continue;
+          const t = l.el.textContent;
+          c.strokeStyle = light ? '#ffffff' : '#101418';
+          c.strokeText(t, s[0] * scale, (s[1] - 4) * scale);
+          c.fillStyle = light ? '#111111' : '#e8eef4';
+          c.fillText(t, s[0] * scale, (s[1] - 4) * scale);
+        }
+      }
+      return await new Promise((res) => cv.toBlob(res, 'image/png'));
+    } finally {
+      this.scene.background = prevBg;
+      r.setClearColor(0x000000, 1);
+      r.setPixelRatio(prevPR);
+      r.setSize(w, h, false);
+      r.domElement.style.width = w + 'px';
+      r.domElement.style.height = h + 'px';
+      this.render();
+    }
+  }
 
   // ------------------------------------------------------------------ interaction geometry
   pixelWorld() {

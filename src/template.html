@@ -28,6 +28,10 @@ button,input,select{font:inherit;color:inherit}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#04202c;font-weight:600}
 .btn.primary:hover{background:#5fd0ff}
 .btn.small{padding:5px 8px;font-size:12px}
+.expwrap{position:relative;display:inline-block}
+#expmenu{position:absolute;right:0;top:calc(100% + 6px);z-index:50;background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:4px;min-width:290px;box-shadow:0 8px 24px #0008}
+#expmenu button{display:block;width:100%;text-align:left;background:none;border:0;color:inherit;padding:8px 10px;font-size:13px;cursor:pointer;border-radius:6px}
+#expmenu button:hover{background:var(--accent2);color:#fff}
 .btn:disabled{opacity:.45;cursor:default}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .seg .btn{border:0;border-radius:0;border-right:1px solid var(--line)}
@@ -135,7 +139,15 @@ table.kv td:last-child{word-break:break-word;font-variant-numeric:tabular-nums}
     <span class="sep"></span>
     <button class="btn" id="b-proj" title="Toggle perspective / orthographic">Perspective</button>
     <button class="btn" id="b-pan" title="Left click pans instead of orbiting (useful on laptops or touch screens)">Orbit</button>
-    <button class="btn" id="b-shot">Screenshot</button>
+    <span class="expwrap">
+      <button class="btn" id="b-shot" title="Export the view as an image or vector file">Export &#9662;</button>
+      <div id="expmenu" hidden>
+        <button data-exp="png3">PNG &middot; current view, high-res (3&times;)</button>
+        <button data-exp="png6">PNG &middot; current view, very high-res (6&times;)</button>
+        <button data-exp="pngt">PNG &middot; transparent background</button>
+        <button data-exp="svg">SVG &middot; plan view, vector (visible layers)</button>
+      </div>
+    </span>
     <button class="btn" id="panelbtn">Panel</button>
   </div>
 

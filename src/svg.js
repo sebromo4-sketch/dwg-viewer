@@ -25,8 +25,9 @@ export function buildSvg(g, opts = {}) {
   out.push(`<rect x="${f(x0)}" y="${f(-y1)}" width="${f(W)}" height="${f(H)}" fill="${bg}"/>`);
   const sw = px * 1.1;
   let fillTris = 0;
-  for (const L of g.layers) {
-    if (L.hidden) continue;
+  for (let li = 0; li < g.layers.length; li++) {
+    const L = g.layers[li];
+    if (L.hidden || (opts.visible && opts.visible[li] === false)) continue;
     out.push(`<g id="${esc(L.name)}">`);
     // fills (triangles) grouped by color
     for (const [S, op] of [[L.fills, 1], [L.tris, 0.55], [L.pfills, 0.9]]) {

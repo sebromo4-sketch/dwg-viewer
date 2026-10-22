@@ -35,7 +35,31 @@ function normLtypes(entries) {
   return m;
 }
 
+// libredwg can hand back UTF-8 bytes as Latin-1 characters ("Ø" -> "Ã\u0098", "°" -> "Â°").
+// Re-decode a string only when it is pure Latin-1 AND the bytes form valid UTF-8, so genuine
+// Latin-1 text ("Año") is left alone.
+const LATIN1_HI = /[\u0080-\u00ff]/, NON_LATIN1 = /[^\u0000-\u00ff]/;
+const _utf8 = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: true }) : null;
+export function fixMojibake(str) {
+  if (!_utf8 || !LATIN1_HI.test(str) || NON_LATIN1.test(str)) return str;
+  try {
+    const b = new Uint8Array(str.length);
+    for (let i = 0; i < str.length; i++) b[i] = str.charCodeAt(i);
+    return _utf8.decode(b);
+  } catch { return str; }
+}
+function fixStrings(o, seen = new WeakSet()) {
+  if (!o || typeof o !== 'object' || seen.has(o)) return;
+  seen.add(o);
+  for (const k of Object.keys(o)) {
+    const v = o[k];
+    if (typeof v === 'string') { const f = fixMojibake(v); if (f !== v) o[k] = f; }
+    else if (v && typeof v === 'object') fixStrings(v, seen);
+  }
+}
+
 export function fromDwgDatabase(db) {
+  fixStrings(db);
   const layers = new Map();
   for (const l of db.tables?.LAYER?.entries || []) layers.set(l.name, normLayer(l, 'dwg'));
   const blocks = new Map();
